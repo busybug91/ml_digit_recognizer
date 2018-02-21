@@ -51,7 +51,7 @@ stddev = 0.1
 # setup place holders (inputs that we are going to supply)
 
 # for images
-X = tf.placeholder(tf.float32, [None, 28, 28, 1]) # None means we don't know how many images at this point. At run time, it would be batch size
+X = tf.placeholder(tf.float32, [None, 784]) # None means we don't know how many images at this point. At run time, it would be batch size
 
 # for correct labels
 Y = tf.placeholder(tf.float32, [None, 10])
@@ -79,7 +79,7 @@ B4 = tf.Variable(tf.zeros(L4))
 
 
 # model setup
-Y0 = tf.nn.sigmoid((tf.matmul(tf.reshape(X, [-1, 784]),W0) + B0))
+Y0 = tf.nn.sigmoid((tf.matmul(X,W0) + B0))
 Y1 = tf.nn.sigmoid(tf.matmul(Y0,W1) + B1)
 Y2 = tf.nn.sigmoid(tf.matmul(Y1,W2) + B2)
 Y3 = tf.nn.sigmoid(tf.matmul(Y2,W3) + B3)
@@ -97,5 +97,29 @@ cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits = probabilities, 
 # an optimizer to minimize our distance/ cross entropy
 learning_rate = 0.003
 optimizer = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
+
+
+init = tf.initialize_all_variables()
+session = tf.Session()
+session.run(init)
+
+for i in range(1,1000):
+    
+    # we need a chunk of data to start processing
+    input_chunk = np.array(next(input_batch))
+
+    print('Iteration: {0}'.format(i))
+    if input_chunk.size == 0:
+        break
+
+    Y_chunk = input_chunk[:,0]
+    X_chunk = input_chunk[:,1:]
+
+    Y_chunk_one_hot = (tf.one_hot(indices = Y_chunk, depth = 10)).eval(session=session)
+
+    train_data_dict = { X : X_chunk, Y : Y_chunk_one_hot}
+
+    session.run(optimizer, feed_dict = train_data_dict)
+
 
 input_file.close()
