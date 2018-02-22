@@ -28,6 +28,45 @@ import csv
 import math
 from lib.file_reader import read_chunks
 
+def train_model(total_input_rows, mini_batch_size, input_batch, session, optimizer):
+    
+    # way to measure accuracy
+    correct_predictions = tf.equal(tf.argmax(probabilities_scaled, 1), tf.argmax(Y,1))
+    accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
+
+    for i in range(1, math.ceil(total_input_rows / mini_batch_size)):
+        
+        # we need a chunk of data to start processing
+        input_chunk = np.array(next(input_batch))   
+        
+        if input_chunk.size == 0:
+            break
+
+        Y_chunk = input_chunk[:,0]
+        X_chunk = input_chunk[:,1:]
+
+        Y_chunk_one_hot = (tf.one_hot(indices = Y_chunk, depth = 10)).eval(session=session)
+
+        train_data_dict = { X : X_chunk, Y : Y_chunk_one_hot}
+
+        session.run(optimizer, feed_dict = train_data_dict)
+
+        if (i % 10 == 0):
+            print('Iteration: {0}'.format(i))
+            a = session.run([accuracy], feed_dict = train_data_dict)
+            print("Accuracy: " + str(a)) 
+
+def test_model(total_input_rows, mini_batch_size, input_batch, session, optimizer, probabilities_scaled):
+
+    # ToDo: add more output file code
+    for i in range(1, math.ceil(total_input_rows / mini_batch_size)):
+        
+        # we need a chunk of data to start processing
+        input_chunk = np.array(next(input_batch))   
+        test_data_dict = { X : input_chunk}
+
+        test_data_predictions = session.run(tf.argmax(probabilities_scaled,1), feed_dict = test_data_dict)
+        print(test_data_predictions)
 
 # TODO: see if setting a seed is required at graph level
 # It would be needed if we run multiple sessions and want each session to have same random sequence
@@ -97,11 +136,6 @@ probabilities_scaled = tf.nn.softmax(probabilities)         # softmax is going t
 # softmax_cross_entropy uses unscaled probabilities as it would do the scaling for us
 cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits = probabilities, labels = Y)
 
-# way to measure accuracy
-correct_predictions = tf.equal(tf.argmax(probabilities_scaled, 1), tf.argmax(Y,1))
-accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
-
-
 # an optimizer to minimize our distance/ cross entropy
 learning_rate = 0.003
 optimizer = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
@@ -111,26 +145,19 @@ init = tf.initialize_all_variables()
 session = tf.Session()
 session.run(init)
 
-for i in range(1, math.ceil(total_input_rows / mini_batch_size)):
-    
-    # we need a chunk of data to start processing
-    input_chunk = np.array(next(input_batch))   
-    
-    if input_chunk.size == 0:
-        break
+train_model(total_input_rows, mini_batch_size, input_batch, session, optimizer)
 
-    Y_chunk = input_chunk[:,0]
-    X_chunk = input_chunk[:,1:]
+input_file = open('data/test.csv',mode='r')
+input_reader = csv.reader(input_file, delimiter=',')
+next(input_reader) # skip header
 
-    Y_chunk_one_hot = (tf.one_hot(indices = Y_chunk, depth = 10)).eval(session=session)
 
-    train_data_dict = { X : X_chunk, Y : Y_chunk_one_hot}
+total_input_rows = 28000;
+mini_batch_size = 50;
 
-    session.run(optimizer, feed_dict = train_data_dict)
+# instantiate generator
+input_batch=read_chunks(input_reader, mini_batch_size)
 
-    if (i % 10 == 0):
-        print('Iteration: {0}'.format(i))
-        a = session.run([accuracy], feed_dict = train_data_dict)
-        print("Accuracy: " + str(a)) 
+test_model(total_input_rows, mini_batch_size, input_batch, session, optimizer, probabilities_scaled)
 
-input_file.close()
+input_file.close()    
