@@ -26,7 +26,7 @@ import tensorflow as tf
 import numpy as np
 import csv
 import math
-from lib.file_reader import read_chunks
+from lib.file_util import read_chunks, write_chunks
 
 def train_model(total_input_rows, mini_batch_size, input_batch, session, optimizer):
     
@@ -34,7 +34,7 @@ def train_model(total_input_rows, mini_batch_size, input_batch, session, optimiz
     correct_predictions = tf.equal(tf.argmax(probabilities_scaled, 1), tf.argmax(Y,1))
     accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
 
-    for i in range(1, math.ceil(total_input_rows / mini_batch_size)):
+    for i in range(0, math.ceil(total_input_rows / mini_batch_size)):
         
         # we need a chunk of data to start processing
         input_chunk = np.array(next(input_batch))   
@@ -52,21 +52,26 @@ def train_model(total_input_rows, mini_batch_size, input_batch, session, optimiz
         session.run(optimizer, feed_dict = train_data_dict)
 
         if (i % 10 == 0):
-            print('Iteration: {0}'.format(i))
             a = session.run([accuracy], feed_dict = train_data_dict)
-            print("Accuracy: " + str(a)) 
+            print('Iteration: {0} - * - * - * - * - * - Accuracy: {1}'.format(i, str(a)))
 
 def test_model(total_input_rows, mini_batch_size, input_batch, session, optimizer, probabilities_scaled):
 
-    # ToDo: add more output file code
-    for i in range(1, math.ceil(total_input_rows / mini_batch_size)):
-        
-        # we need a chunk of data to start processing
-        input_chunk = np.array(next(input_batch))   
-        test_data_dict = { X : input_chunk}
+    with open('data/submission.csv', 'w') as csvfile:
+        fieldnames = ['ImageId', 'Label']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
 
-        test_data_predictions = session.run(tf.argmax(probabilities_scaled,1), feed_dict = test_data_dict)
-        print(test_data_predictions)
+        num_images_predicted = 0
+        for i in range(0, math.ceil(total_input_rows / mini_batch_size)):
+            
+            # we need a chunk of data to start processing
+            input_chunk = np.array(next(input_batch))   
+            test_data_dict = { X : input_chunk}
+
+            test_data_predictions = session.run(tf.argmax(probabilities_scaled,1), feed_dict = test_data_dict)
+            write_chunks(writer, num_images_predicted, test_data_predictions.tolist())
+            num_images_predicted += test_data_predictions.size
 
 # TODO: see if setting a seed is required at graph level
 # It would be needed if we run multiple sessions and want each session to have same random sequence
